@@ -86,6 +86,16 @@ contract Auction{
           highestBidder= payable(msg.sender);
       }
    }
-
+  
+    modifier onlyOwner(){
+        require(msg.sender==owner);
+        _;
+    }
+   // cancelling the auction
+    
+    function cancelAuction() public onlyOwner{
+        auctionState = State.Cancelled;
+        
+    }
 
 }
