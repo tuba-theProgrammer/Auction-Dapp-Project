@@ -25,17 +25,18 @@ contract Auction{
 
    uint bidIncrement;
    
-   constructor(){
-    owner = payable(msg.sender);
+   constructor(address eoa){
+    owner = payable(eoa);
     auctionState= State.Running;
 
     startBlock = block.number;
     // this means that the auction will be running for a week
+    // we can limit the transactions by changing this number
     endBlock = startBlock+40320;
     
     ipfsHash="";
-    // bid increment will be 100 wei
-    bidIncrement = 100;
+    // bid increment will be 1 ether
+    bidIncrement = 1000000000000000000;
 
    }
 
@@ -95,7 +96,52 @@ contract Auction{
     
     function cancelAuction() public onlyOwner{
         auctionState = State.Cancelled;
-        
+
     }
+    // withdrawal patter - helps to avoid re-entrance attack that could cause unexpected
+    // unwxpected behaviour - like financial loss to users
+
+
+    // now finalizing the auction
+    function finalizeAuction() public{
+        require(auctionState==State.Cancelled|| block.number>endBlock);
+        // check who cancelled the auction is owner or not
+        // also the person who want to finalize this should only be biider - by checking their bidding value
+        require(msg.sender==owner|| bids[msg.sender]>0);
+        address payable recipient;
+        uint value;
+
+        if(auctionState==State.Cancelled){ // auction was cancelled
+        // then each bidder will get their ether back - by calling this function one by one 
+        //- at the frontend
+            recipient= payable(msg.sender);
+            value = bids[msg.sender];
+
+        }else{ // auction ended (not cancelled)
+             if(msg.sender==owner){ // if ended by owner
+            
+                recipient= owner;
+                value= highestBidingBid;
+             }else{ // if ender by highest bidder
+                 if(msg.sender==highestBidder){
+                    recipient= highestBidder;
+                    value= bids[highestBidder] = highestBidingBid;
+                 }else{ // this is neither the owner nor the highest bidder
+                        recipient= payable(msg.sender);
+                        value = bids[msg.sender];
+                  }
+             }
+        }
+        // resetting the bids of receipient to zero
+        // so that they can't repeatedly finalize the auction and gets the value each time
+         bids[recipient]= 0;
+        recipient.transfer(value);
+        
+       
+    }
+
+
+
+    // how to scale application from 1 auction to hundreds of auction
 
 }
